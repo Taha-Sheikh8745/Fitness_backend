@@ -1,77 +1,66 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
+  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : null;
+
   const isDummySMTP = 
-    !process.env.SMTP_HOST || 
-    !process.env.SMTP_USER || 
-    process.env.SMTP_USER.includes('your_email') || 
-    process.env.SMTP_USER.includes('example.com') ||
-    !process.env.SMTP_PASS ||
-    process.env.SMTP_PASS.includes('your_app_password') ||
-    process.env.SMTP_PASS.includes('your_gmail_app_password');
+    !smtpUser || 
+    smtpUser.includes('your_email') || 
+    smtpUser.includes('example.com') ||
+    !smtpPass ||
+    smtpPass.includes('your_app_password') ||
+    smtpPass.includes('your_gmail_app_password');
 
-  // If SMTP is dummy or in Development Mode, print OTP/email to console for convenience
-  if (isDummySMTP || process.env.NODE_ENV !== 'production') {
-    console.log('\n=============================================');
-    console.log(`[Development Mode] Email to: ${options.email}`);
-    console.log(`Subject: ${options.subject}`);
-    console.log(`Message: ${options.message}`);
-    console.log('=============================================\n');
+  console.log(`\n📧 [FitForge Email Service] Preparing email for: ${options.email}`);
+  console.log(`Subject: ${options.subject}`);
 
-    // If SMTP credentials appear real, try sending, but catch errors safely
-    if (!isDummySMTP) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: process.env.SMTP_PORT || 587,
-          secure: process.env.SMTP_PORT == 465,
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-          tls: { rejectUnauthorized: false }
-        });
-
-        const mailOptions = {
-          from: `${process.env.EMAIL_FROM_NAME || 'FitForge AI'} <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
-          to: options.email,
-          subject: options.subject,
-          text: options.message,
-          html: options.html,
-        };
-
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ Email sent successfully to ${options.email}`);
-      } catch (err) {
-        console.warn(`⚠️ Real SMTP email sending failed (${err.message}). Safe fallback to dev console log.`);
-      }
-    }
+  if (isDummySMTP) {
+    console.warn('⚠️ SMTP credentials not fully configured in environment variables. Email logged to console fallback.');
+    console.log(`[Email Content]: ${options.message}\n`);
     return;
   }
 
-  // Production Mode with verified credentials
   try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT || 587,
-      secure: process.env.SMTP_PORT == 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    const isGmail = smtpHost.includes('gmail');
+    
+    const transporterConfig = isGmail
+      ? {
+          service: 'gmail',
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        }
+      : {
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT) || 587,
+          secure: process.env.SMTP_PORT == 465,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+          tls: { rejectUnauthorized: false }
+        };
+
+    const transporter = nodemailer.createTransport(transporterConfig);
+
+    const fromAddress = `${process.env.EMAIL_FROM_NAME || 'FitForge AI'} <${smtpUser}>`;
 
     const mailOptions = {
-      from: `${process.env.EMAIL_FROM_NAME || 'FitForge AI'} <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+      from: fromAddress,
       to: options.email,
       subject: options.subject,
       text: options.message,
       html: options.html,
     };
 
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent successfully to ${options.email} (MessageID: ${info.messageId})\n`);
   } catch (error) {
-    console.error(`❌ SMTP Error: ${error.message}`);
+    console.error(`❌ SMTP Email Sending Error to ${options.email}:`, error.message);
+    throw error;
   }
 };
 

@@ -54,8 +54,7 @@ const registerUser = async (req, res) => {
         return res.status(200).json({ 
           success: true, 
           message: 'User exists but not verified. New OTP generated.', 
-          requireVerification: true,
-          devOtp: otp
+          requireVerification: true
         });
       }
       return res.status(400).json({ success: false, message: 'User already exists' });
@@ -89,9 +88,8 @@ const registerUser = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful!',
-      requireVerification: true,
-      devOtp: otp
+      message: 'Registration successful! Verification code sent to email.',
+      requireVerification: true
     });
   } catch (error) {
     console.error('Registration Error:', error);
@@ -140,8 +138,7 @@ const resendOTP = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'New verification code generated.',
-      devOtp: otp
+      message: 'New verification code sent to your email.'
     });
   } catch (error) {
     console.error('Resend OTP Error:', error);
